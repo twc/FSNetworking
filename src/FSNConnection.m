@@ -12,19 +12,6 @@
 #import "FSNConnection.h"
 
 
-// Typically, FSN_QUEUED_CONNECTIONS is set to 0 or 1 in the target's prefix header.
-// Note that NSURLConnection setDelegateQueue appears to be broken on iOS 5.1, causing application-wide deadlocks.
-// See README.md for details.
-
-#if FSN_QUEUED_CONNECTIONS
-
-#if TARGET_OS_IPHONE
-#warning "NSURLConnection using setDelegateQueue is known to deadlock on iOS 5"
-#endif
-
-#endif
-
-
 NSString * const FSNConnectionActivityBegan = @"FSNConnectionActivityBegan";
 NSString * const FSNConnectionActivityEnded = @"FSNConnectionActivityEnded";
 
@@ -38,6 +25,10 @@ NSString* stringForRequestMethod(FSNRequestMethod method) {
             return nil;
     }
 }
+
+static BOOL _useQueuedConnections;
+static NSTimeInterval _defaultTimeoutInterval = 60.0;
+
 
 
 @interface FSNConnection ()
@@ -115,6 +106,31 @@ NSString* stringForRequestMethod(FSNRequestMethod method) {
 }
 
 
++ (void)initialize
+{
+#if TARGET_OS_IPHONE
+    // see if we're running on iOS 6 or above
+    // NOTE: we're checking the os version directly instead of looking for a
+    //       behavior since queued connections was added in iOS 5.1 but did not
+    //       work correctly until 6.0.
+    if  ( [[[UIDevice currentDevice] systemVersion] floatValue] >= 6.0f )
+    {
+        // iOS 6+
+        _useQueuedConnections = YES;
+    }
+    else
+    {
+        // pre iOS 6
+        _useQueuedConnections = NO;
+    }
+#else
+    // supported under mac os for all versions we support
+    _useQueuedConnections = YES;
+#endif
+
+}
+
+
 - (id)init {
     INIT([super init]);
     
@@ -122,7 +138,8 @@ NSString* stringForRequestMethod(FSNRequestMethod method) {
     // - calling clearBlocks may cause an object in the block closure to be released
     // - that may in turn 'own' the connection, and call clearBlocks to properly break retain cycles in all cases.
     self.blocksLock = [NSRecursiveLock new];
-    
+    self.timeoutInterval = _defaultTimeoutInterval;
+
     return self;
 }
 
@@ -264,7 +281,6 @@ totalBytesExpectedToWrite:(NSInteger)totalBytesExpectedToWrite {
 #pragma mark - FSNConnection
 
 
-#if FSN_QUEUED_CONNECTIONS
 + (NSOperationQueue *)queue {
     static NSOperationQueue *q = nil;
     if (!q) {
@@ -273,7 +289,6 @@ totalBytesExpectedToWrite:(NSInteger)totalBytesExpectedToWrite {
     }
     return q;
 }
-#endif
 
 
 + (NSMutableSet *)mutableConnections {
@@ -325,6 +340,15 @@ progressBlock:(FSNProgressBlock)progressBlock {
     return c;
 }
 
++ (int)defaultTimeoutInterval
+{
+    return _defaultTimeoutInterval;
+}
+
++ (void)setDefaultTimeoutInterval:(NSTimeInterval)interval
+{
+    _defaultTimeoutInterval = interval;
+}
 
 // MARK: accessors
 
@@ -431,15 +455,18 @@ NSAssert(!self.didStart, @"method cannot be called after start: %s", __FUNCTION_
 
 
 - (void)callOrDispatchParse {
-    
-#if FSN_QUEUED_CONNECTIONS
-    [self parse];
-#else
-    // dispatch to the medium priority global queue
-    dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
+
+    if ( _useQueuedConnections )
+    {
         [self parse];
-    });
-#endif
+    }
+    else
+    {
+        // dispatch to the medium priority global queue
+        dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
+            [self parse];
+        });
+    }
 }
 
 
@@ -564,11 +591,14 @@ NSAssert(!self.didStart, @"method cannot be called after start: %s", __FUNCTION_
         return nil;
     }
     
-#if FSN_QUEUED_CONNECTIONS
-    [self.connection setDelegateQueue:[self.class queue]];
-#else
-    [self.connection scheduleInRunLoop:[NSRunLoop mainRunLoop] forMode:NSRunLoopCommonModes];
-#endif
+    if ( _useQueuedConnections )
+    {
+        [self.connection setDelegateQueue:[self.class queue]];
+    }
+    else
+    {
+        [self.connection scheduleInRunLoop:[NSRunLoop mainRunLoop] forMode:NSRunLoopCommonModes];
+    }
     
     [self.connection start];
     
@@ -763,6 +793,7 @@ void logParameter(FSNRequestMethod method, id key, id val) {
 #endif
     
     [r setHTTPMethod:stringForRequestMethod(self.method)];
+    [r setTimeoutInterval:self.timeoutInterval];
     
 #if FSN_LOG_HEADERS
 #define SET_HEADER(k, v) \
@@ -824,6 +855,8 @@ FSNErr(@"- header: %-16s : %@", [k UTF8String], v); [r setValue:v forHTTPHeaderF
     
     return r;
 }
+
+
 
 
 @end

@@ -106,6 +106,7 @@ NSString* stringForRequestMethod(FSNRequestMethod method);
 @property (nonatomic, readonly) NSTimeInterval finishOrFailInterval;
 @property (nonatomic, readonly) NSTimeInterval parseInterval;
 
+@property (nonatomic, assign) NSTimeInterval timeoutInterval;
 
 + (id)withUrl:(NSURL *)url
        method:(FSNRequestMethod)method
@@ -118,6 +119,8 @@ progressBlock:(FSNProgressBlock)progressBlock;
 
 + (NSSet *)connections;
 + (void)cancelAllConnections;
++ (int)defaultTimeoutInterval;
++ (void)setDefaultTimeoutInterval:(NSTimeInterval)interval;
 
 
 // call this method to allow the request to complete but ignore the response.

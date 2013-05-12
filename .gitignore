@@ -1,15 +1,29 @@
-# Xcode
-build/*
-*.pbxuser
-!default.pbxuser
-*.mode1v3
-!default.mode1v3
-*.mode2v3
-!default.mode2v3
-*.perspectivev3
-!default.perspectivev3
-*.xcworkspace
-!default.xcworkspace
+# Exclude the build directories
+[Dd]erived[Dd]ata/
+[Bb]uild/
+[Ii]ntermediates
+
+# Exclude temp and swap files
+*~.nib
+*.swp
+*~
+
+# Exclude OS X cruft
+.DS_Store
+[Tt]humbs.db
+.Trashes
+
+# Exclude User Data from Workspace and Projects
 xcuserdata
-profile
-*.moved-aside
+*.xcuserdata
+
+# Exclude CocoaPods pods from
+[Pp]ods
+
+# Exclude other common files
+*.log
+*.bak*
+
+
+
+
