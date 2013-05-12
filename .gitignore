@@ -17,6 +17,9 @@
 xcuserdata
 *.xcuserdata
 
+# exclude default workspaces from projects
+project.xcworkspace/
+
 # Exclude CocoaPods pods from
 [Pp]ods
 
