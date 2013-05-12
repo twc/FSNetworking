@@ -286,6 +286,11 @@ totalBytesExpectedToWrite:(NSInteger)totalBytesExpectedToWrite {
     if (!q) {
         q = [NSOperationQueue new];
         q.name = @"FSNConnection queue";
+
+        // limit the number of concurrent connections to 4 (help prevent timeouts)
+        // since many servers limit the number of requests a single clinet may
+        // make at a time
+        q.maxConcurrentOperationCount = 4;
     }
     return q;
 }
